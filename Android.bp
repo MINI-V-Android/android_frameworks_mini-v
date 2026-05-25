@@ -4,6 +4,7 @@ aidl_interface {
         "aidl/com/miniv/ai/IMINIVAIService.aidl",
         "aidl/com/miniv/ai/ILLMStreamCallback.aidl",
     ],
+    local_include_dir: "aidl",
     unstable: true,
     backend: {
         java: {
