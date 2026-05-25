@@ -1,0 +1,13 @@
+aidl_interface {
+    name: "mini-v-aidl",
+    srcs: [
+        "aidl/com/miniv/ai/IMINIVAIService.aidl",
+        "aidl/com/miniv/ai/ILLMStreamCallback.aidl",
+    ],
+    unstable: true,
+    backend: {
+        java: {
+            enabled: true,
+        },
+    },
+}
