@@ -9,8 +9,17 @@ public class MINIVAIService extends IMINIVAIService.Stub {
     // Constants
     private static final String TAG = "MINIVAIService";
 
+    // LLM Engine instance
+    private final LLMEngine mEngine;
+    // Executor
+    private final ExecutorService mExecutor;
+    // Session ID
+    private final AtomicInteger mNextSessionId = new AtomicInteger(1);
+
     public MINIVAIService() {
-        // TODO: Init service instance
+        mEngine = new SimpleLLMEngine();
+        mExecutor = Executors.newCachedThreadPool();
+        Log.i(TAG, "Initialized MINIVAIService");
     }
 
     /**
