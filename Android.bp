@@ -21,7 +21,7 @@ java_library {
         "java/com/miniv/ai/service/MINIVAIService.java",
     ],
     libs: [
-        "mini-v-aidl-V1-java",
+        "mini-v-aidl-java",
         "framework",
     ],
     sdk_version: "",
