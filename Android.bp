@@ -12,3 +12,18 @@ aidl_interface {
         },
     },
 }
+
+java_library {
+    name: "mini-v-service",
+    srcs: [
+        "java/com/miniv/ai/engine/LLMEngine.java",
+        "java/com/miniv/ai/engine/SimpleLLMEngine.java",
+        "java/com/miniv/ai/service/MINIVAIService.java",
+    ],
+    libs: [
+        "mini-v-aidl-V1-java",
+        "framework",
+    ],
+    sdk_version: "",
+    platform_apis: true,
+}
