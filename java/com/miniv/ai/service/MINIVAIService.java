@@ -41,6 +41,10 @@ public class MINIVAIService extends IMINIVAIService.Stub {
      * 
      * @return Session ID
      *      Negative if failed to create session
+     * Error codes:
+     *      -1 : Engine not ready
+     *      -2 : Invalid parameters
+     *      -3 : Failed to link to death
      */
     @Override
     public int inferStream(String prompt, int maxTokens, ILLMStreamCallback callback) {
