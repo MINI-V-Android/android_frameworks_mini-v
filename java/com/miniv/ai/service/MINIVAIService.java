@@ -59,6 +59,18 @@ public class MINIVAIService extends IMINIVAIService.Stub {
         // Current session id
         final int sessionId = mNextSessionId.getAndIncrement();
 
+        // Add watching for client death
+        try {
+            callback.asBinder().linkToDeath(() -> {
+                // Callback cancel
+                Log.w(TAG, "Client died, cancelling session " + sessionId);
+                mEngine.cancel(sessionId);
+            }, 0);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to linkToDeath for session " + sessionId, e);
+            return -3;
+        }
+
         // Run engine inference with Executor
         mExecutor.submit(() -> {
             mEngine.infer(sessionId, prompt, maxTokens, new LLMEngine.TokenCallback() {
