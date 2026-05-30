@@ -24,11 +24,12 @@ public class MINIVAIService extends IMINIVAIService.Stub {
 
     /**
      * Check if AI Service is ready
+     *
+     * @return Is engine ready, or not
      */
     @Override
     public boolean isReady() {
-        // TODO: Implement
-        return false;
+        return mEngine.isReady();
     }
 
     /**
@@ -43,8 +44,60 @@ public class MINIVAIService extends IMINIVAIService.Stub {
      */
     @Override
     public int inferStream(String prompt, int maxTokens, ILLMStreamCallback callback) {
-        // TODO: Implement
-        return 0;
+        // Check if engine is ready
+        if (!mEngine.isReady()) {
+            Log.w(TAG, "inferStream() called but engine is not ready");
+            return -1;
+        }
+
+        // Check if parameter available
+        if (prompt == null || prompt.isEmpty() || maxTokens <= 0 || callback == null) {
+            Log.w(TAG, "inferStream() called with invalid parameters");
+            return -2;
+        }
+
+        // Current session id
+        final int sessionId = mNextSessionId.getAndIncrement();
+
+        // Run engine inference with Executor
+        mExecutor.submit(() -> {
+            mEngine.infer(sessionId, prompt, maxTokens, new LLMEngine.TokenCallback() {
+                @Override
+                public void onToken(String token) {
+                    try {
+                        // Callback onToken
+                        callback.onToken(sessionId, token);
+                    } catch (RemoteException e) {
+                        // Callback cancel
+                        Log.w(TAG, "onToken failed, cancelling session " + sessionId, e);
+                        mEngine.cancel(sessionId);
+                    }
+                }
+
+                @Override
+                public void onComplete() {
+                    try {
+                        // Callback onComplete
+                        callback.onComplete(sessionId);
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "onComplete failed, session " + sessionId, e);
+                    }
+                }
+
+                @Override
+                public void onError(int code, String message) {
+                    try {
+                        // Callback onError
+                        callback.onError(sessionId, code, message);
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "onError failed, session " + sessionId, e);
+                    }
+                }
+            });
+        });
+
+        // Return current session id
+        return sessionId;
     }
 
     /**
@@ -54,15 +107,17 @@ public class MINIVAIService extends IMINIVAIService.Stub {
      */
     @Override
     public void cancel(int sessionId) {
-        // TODO: Implement
+        Log.i(TAG, "cancel() requested for session " + sessionId);
+        mEngine.cancel(sessionId);
     }
 
     /**
      * Get model info String
+     *
+     * @return model info from engine
      */
     @Override
     public String getModelInfo() {
-        // TODO: Implement
-        return TAG;
+        return mEngine.getModelInfo();
     }
 }
