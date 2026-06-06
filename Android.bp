@@ -20,8 +20,10 @@ java_library {
         "java/com/miniv/ai/engine/SimpleLLMEngine.java",
         "java/com/miniv/ai/service/MINIVAIService.java",
     ],
-    libs: [
+    static_libs: [
         "mini-v-aidl-java",
+    ],
+    libs: [
         "framework",
     ],
     sdk_version: "",
