@@ -1,5 +1,17 @@
 package com.miniv.ai.service;
 
+import android.os.RemoteException;
+import android.util.Log;
+
+import com.miniv.ai.ILLMStreamCallback;
+import com.miniv.ai.IMINIVAIService;
+import com.miniv.ai.engine.LLMEngine;
+import com.miniv.ai.engine.SimpleLLMEngine;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * MINI-V AI Service
  *
