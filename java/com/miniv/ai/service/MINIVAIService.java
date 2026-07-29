@@ -219,7 +219,7 @@ public class MINIVAIService extends IMINIVAIService.Stub {
 
                     // Vendor already discarded this session
                     // -> destroy local session info
-                    if (code == LLMEngine.ERROR_SESSION_EVICTED) {
+                    if (code == LLMEngine.ErrorCode.SESSION_EVICTED) {
                         destroySession(sessionId);
                     }
                 }
