@@ -1,6 +1,7 @@
 package com.miniv.ai.engine;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -14,6 +15,8 @@ public class SimpleLLMEngine implements LLMEngine {
     private static final String TAG = "SimpleLLMEngine";
     private static final int TOKEN_DELAY_MS = 100;
 
+    // Active session IDs
+    private final Set<Integer> mSessions = ConcurrentHashMap.newKeySet();
     // <sessionId, cancelled> flags
     private final Map<Integer, AtomicBoolean> mCancelFlags = new ConcurrentHashMap<>();
 
@@ -27,6 +30,35 @@ public class SimpleLLMEngine implements LLMEngine {
     }
 
     /**
+     * Create a new session
+     *
+     * @param sessionId Session ID to create, assigned by the caller
+     *
+     * @return true if the session was created successfully
+     */
+    @Override
+    public boolean createSession(int sessionId) {
+        // Simple engine has no real resource to allocate, just track the id
+        return mSessions.add(sessionId);
+    }
+
+    /**
+     * Destroy a session and release its resources
+     *
+     * @param sessionId Session ID to destroy
+     *
+     * @return true if the session existed and was destroyed
+     */
+    @Override
+    public boolean destroySession(int sessionId) {
+        // Clear any leftover cancel flag
+        mCancelFlags.remove(sessionId);
+
+        // Drop tracked session
+        return mSessions.remove(sessionId);
+    }
+
+    /**
      * Run inference and stream tokens via callback
      *
      * @param sessionId Session ID for this inference
@@ -36,6 +68,12 @@ public class SimpleLLMEngine implements LLMEngine {
      */
     @Override
     public void infer(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
+        // Check if session exists
+        if (!mSessions.contains(sessionId)) {
+            callback.onError(ErrorCode.SESSION_EVICTED, "unknown session: " + sessionId);
+            return;
+        }
+
         // Set cancelled flag as false
         AtomicBoolean cancelled = new AtomicBoolean(false);
         mCancelFlags.put(sessionId, cancelled);
@@ -45,7 +83,7 @@ public class SimpleLLMEngine implements LLMEngine {
             String[] words = prompt.split(" ");
             int tokenCount = 0;
 
-            for (String word: words) {
+            for (String word : words) {
                 // If already cancelled session, break
                 if (cancelled.get()) {
                     break;
@@ -56,7 +94,7 @@ public class SimpleLLMEngine implements LLMEngine {
                     break;
                 }
 
-                // Send onToken callback with splitted word 
+                // Send onToken callback with splitted word
                 callback.onToken(word + " ");
                 tokenCount++;
 
