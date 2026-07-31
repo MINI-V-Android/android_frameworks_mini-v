@@ -70,16 +70,14 @@ public class MINIVAIService extends IMINIVAIService.Stub {
      *
      * @return Session ID
      *         Negative if failed to create session
-     *         Error codes:
-     *         -1 : Engine not ready
-     *         -2 : Failed to allocate session
+     *         Error codes is defined at [IMINIVAIService]
      */
     @Override
     public int createSession() {
         // Check if engine is ready
         if (!mEngine.isReady()) {
             Log.w(TAG, "createSession() called but engine is not ready");
-            return -1;
+            return CREATE_SESSION_ERR_ENGINE_NOT_READY;
         }
 
         // Current session id
@@ -88,7 +86,7 @@ public class MINIVAIService extends IMINIVAIService.Stub {
         // Allocate session on engine
         if (!mEngine.createSession(sessionId)) {
             Log.e(TAG, "engine.createSession() failed for session " + sessionId);
-            return -2;
+            return CREATE_SESSION_ERR_ALLOC_FAILED;
         }
 
         mSessions.put(sessionId, new SessionRecord());
@@ -151,36 +149,32 @@ public class MINIVAIService extends IMINIVAIService.Stub {
      *
      * @return 0 if queued successfully
      *         Negative otherwise
-     *         Error codes:
-     *         -1 : Engine not ready
-     *         -2 : Invalid parameters
-     *         -3 : Failed to link to death
-     *         -4 : Unknown session
+     *         Error codes is defined at [IMINIVAIService]
      */
     @Override
     public int inferStream(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback) {
         // Check if engine is ready
         if (!mEngine.isReady()) {
             Log.w(TAG, "inferStream() called but engine is not ready");
-            return -1;
+            return INFER_ERR_ENGINE_NOT_READY;
         }
 
         // Check if parameter available
         if (prompt == null || prompt.isEmpty() || maxTokens <= 0 || callback == null) {
             Log.w(TAG, "inferStream() called with invalid parameters");
-            return -2;
+            return INFER_ERR_INVALID_PARAMS;
         }
 
         // Check if session exists
         SessionRecord record = mSessions.get(sessionId);
         if (record == null) {
             Log.w(TAG, "inferStream: unknown session " + sessionId);
-            return -4;
+            return INFER_ERR_UNKNOWN_SESSION;
         }
 
         // Add watching for client death
         if (!linkDeath(sessionId, record, callback)) {
-            return -3;
+            return INFER_ERR_LINK_DEATH_FAILED;
         }
 
         // Queue engine inference on the session's Executor
@@ -210,9 +204,14 @@ public class MINIVAIService extends IMINIVAIService.Stub {
 
                 @Override
                 public void onError(int code, String message) {
+                    // Translate the engine-internal error code into the
+                    // AIDL-level contract — callers should never need to
+                    // know about LLMEngine's internals
+                    int reportedCode = translateErrorCode(code);
+
                     try {
                         // Callback onError
-                        callback.onError(sessionId, code, message);
+                        callback.onError(sessionId, reportedCode, message);
                     } catch (RemoteException e) {
                         Log.w(TAG, "onError failed, session " + sessionId, e);
                     }
@@ -255,6 +254,23 @@ public class MINIVAIService extends IMINIVAIService.Stub {
     @Override
     public String getModelInfo() {
         return mEngine.getModelInfo();
+    }
+
+    /**
+     * Translate an LLMEngine.ErrorCode into the ILLMStreamCallback contract.
+     * The app should never need to know about LLMEngine's internal codes.
+     *
+     * @param engineCode One of LLMEngine.ErrorCode's values
+     */
+    private static int translateErrorCode(int engineCode) {
+        switch (engineCode) {
+            case LLMEngine.ErrorCode.SESSION_EVICTED:
+                return ILLMStreamCallback.ERROR_SESSION_EVICTED;
+            case LLMEngine.ErrorCode.CACHE_LIMIT_EXCEEDED:
+                return ILLMStreamCallback.ERROR_CACHE_LIMIT_EXCEEDED;
+            default:
+                return ILLMStreamCallback.ERROR_GENERIC_FAILURE;
+        }
     }
 
     /**

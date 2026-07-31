@@ -6,6 +6,16 @@ import com.miniv.ai.ILLMStreamCallback;
  * MINI-V AI Service AIDL Interface
  */
 interface IMINIVAIService {
+    // Error codes for createSession()
+    const int CREATE_SESSION_ERR_ENGINE_NOT_READY = -101;
+    const int CREATE_SESSION_ERR_ALLOC_FAILED = -102;
+ 
+    // Error codes for inferStream()
+    const int INFER_ERR_ENGINE_NOT_READY = -201;
+    const int INFER_ERR_INVALID_PARAMS = -202;
+    const int INFER_ERR_LINK_DEATH_FAILED = -203;
+    const int INFER_ERR_UNKNOWN_SESSION = -204;
+
     /**
      * Check if AI Service is ready
      */
