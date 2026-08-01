@@ -14,12 +14,28 @@ public interface LLMEngine {
     }
 
     // Error codes reported via TokenCallback.onError()
+    // — the common taxonomy every LLMEngine implementation must translate its own
+    // internal errors into (see SimpleLLMEngine.InternalErrorCode for an
+    // example of a concrete engine's private codes)
     interface ErrorCode {
         // Session is already evicted
-        int SESSION_EVICTED = -10;
+        int SESSION_EVICTED = -1001;
         // Session cache limit has exceed
-        int CACHE_LIMIT_EXCEEDED = -11;
+        int CACHE_LIMIT_EXCEEDED = -1002;
+        // Engine-specific failure
+        int GENERIC_FAILURE = -1003;
     }
+
+    /**
+     * Translate an engine-implementation-internal error code into the
+     * common ErrorCode taxonomy above. Every implementation must provide
+     * this — it is the one place internal codes get converted before ever
+     * reaching TokenCallback.onError(). The internal codes themselves stay
+     * private to each implementation; only this translation is a contract.
+     *
+     * @param internalCode Implementation-specific internal error code
+     */
+    int mapInternalError(int internalCode);
 
     /**
      * Check if engine is ready or not

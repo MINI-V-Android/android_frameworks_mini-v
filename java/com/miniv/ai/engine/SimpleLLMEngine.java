@@ -15,6 +15,12 @@ public class SimpleLLMEngine implements LLMEngine {
     private static final String TAG = "SimpleLLMEngine";
     private static final int TOKEN_DELAY_MS = 100;
 
+    // Engine-specific error codes
+    // — these must be wrapped as LLMEngine.ErrorCode (see mapInternalError())
+    private interface InternalErrorCode {
+        int INTERRUPTED = -2001;
+    }
+
     // Active session IDs
     private final Set<Integer> mSessions = ConcurrentHashMap.newKeySet();
     // <sessionId, cancelled> flags
@@ -109,7 +115,7 @@ public class SimpleLLMEngine implements LLMEngine {
         } catch (InterruptedException e) {
             // If any exception caught, kill and send onError callback
             Thread.currentThread().interrupt();
-            callback.onError(-1, "Interrupted");
+            callback.onError(mapInternalError(InternalErrorCode.INTERRUPTED), "Interrupted");
         } finally {
             // Clear cancelled flag info
             mCancelFlags.remove(sessionId);
@@ -136,5 +142,19 @@ public class SimpleLLMEngine implements LLMEngine {
     @Override
     public String getModelInfo() {
         return TAG;
+    }
+
+    /**
+     * Translate an engine-internal error code into the common
+     * LLMEngine.ErrorCode taxonomy
+     */
+    @Override
+    public int mapInternalError(int internalCode) {
+        switch (internalCode) {
+            case InternalErrorCode.INTERRUPTED:
+                return ErrorCode.GENERIC_FAILURE;
+            default:
+                return ErrorCode.GENERIC_FAILURE;
+        }
     }
 }
