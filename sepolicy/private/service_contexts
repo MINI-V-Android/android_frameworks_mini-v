@@ -1,0 +1,2 @@
+miniv_ai	u:object_r:miniv_ai_service:s0
+vendor.miniv.ai.IMiniVAiHal/default u:object_r:hal_miniv_ai_service:s0
