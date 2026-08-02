@@ -1,4 +1,5 @@
 type miniv_ai_service, service_manager_type;
 
 allow system_server miniv_ai_service:service_manager { add };
+allow platform_app miniv_ai_service:service_manager { find };
 allow priv_app miniv_ai_service:service_manager { find };
