@@ -1,0 +1,6 @@
+hal_attribute(miniv_ai)
+
+type hal_miniv_ai_service, hal_service_type, service_manager_type;
+hal_attribute_service(hal_miniv_ai, hal_miniv_ai_service)
+
+hal_client_domain(system_server, hal_miniv_ai)
