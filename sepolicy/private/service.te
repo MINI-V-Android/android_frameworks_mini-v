@@ -1,0 +1,4 @@
+type miniv_ai_service, service_manager_type;
+
+allow system_server miniv_ai_service:service_manager { add };
+allow priv_app miniv_ai_service:service_manager { find };
