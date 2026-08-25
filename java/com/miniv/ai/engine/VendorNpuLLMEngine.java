@@ -30,11 +30,34 @@ public class VendorNpuLLMEngine implements LLMEngine {
     // this needs to move behind something like hal.getChatTemplate().
     private static final String DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant.";
 
-    // chatML added
     private static String applyChatTemplate(String userPrompt) {
         return "<|im_start|>system\n" + DEFAULT_SYSTEM_PROMPT + "<|im_end|>\n"
                 + "<|im_start|>user\n" + userPrompt + "<|im_end|>\n"
                 + "<|im_start|>assistant\n";
+    }
+
+    private static final int MODEL_N_CTX = 2048;
+    private static final int CONTEXT_SAFETY_MARGIN = 64;
+
+    /**
+     * Clamp maxTokens so that (estimated prompt tokens + maxTokens) stays
+     * within the model's fixed context window. NpuLLMEngine::infer() does
+     * not check this itself — nothing downstream does — so without this,
+     * a caller requesting a large maxTokens on a long prompt can overrun
+     * the KV cache with undefined behavior.
+     *
+     * Token count is approximated conservatively (~2 chars/token, safe for
+     * mixed Korean/English/CJK input where real tokenizers tend to produce
+     * *more* tokens per char than plain English) since no real tokenize()
+     * call is available here.
+     */
+    private static int clampMaxTokens(String formattedPrompt, int requestedMaxTokens) {
+        int estimatedPromptTokens = (formattedPrompt.length() / 2) + 1;
+        int budget = MODEL_N_CTX - estimatedPromptTokens - CONTEXT_SAFETY_MARGIN;
+        if (budget < 1) {
+            budget = 1; // still attempt something rather than refusing outright
+        }
+        return Math.min(requestedMaxTokens, budget);
     }
 
     // Vendor-HAL-internal error codes reported via IMiniVAiStreamCallback.onError()
@@ -155,7 +178,12 @@ public class VendorNpuLLMEngine implements LLMEngine {
             // Synchronous return only tells us whether the request was
             // *accepted*; actual success/failure streams back via halCallback.
             String formattedPrompt = applyChatTemplate(prompt);
-            int ret = hal.inferStream(sessionId, formattedPrompt, maxTokens, halCallback);
+            int clampedMaxTokens = clampMaxTokens(formattedPrompt, maxTokens);
+            if (clampedMaxTokens < maxTokens) {
+                Log.w(TAG, "maxTokens clamped from " + maxTokens + " to " + clampedMaxTokens
+                        + " to fit context window (nCtx=" + MODEL_N_CTX + ")");
+            }
+            int ret = hal.inferStream(sessionId, formattedPrompt, clampedMaxTokens, halCallback);
             if (ret != 0) {
                 Log.w(TAG, "inferStream(" + sessionId + ") rejected, HAL returned " + ret);
                 callback.onError(ErrorCode.GENERIC_FAILURE,
