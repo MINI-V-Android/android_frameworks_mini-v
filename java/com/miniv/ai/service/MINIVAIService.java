@@ -35,7 +35,7 @@ public class MINIVAIService extends IMINIVAIService.Stub {
     private final ConcurrentHashMap<Integer, SessionRecord> mSessions = new ConcurrentHashMap<>();
 
     public MINIVAIService() {
-        mEngine = new SimpleLLMEngine();
+        mEngine = new VendorNpuLLMEngine();
         Log.i(TAG, "Initialized MINIVAIService");
     }
 

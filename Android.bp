@@ -18,10 +18,12 @@ java_library {
     srcs: [
         "java/com/miniv/ai/engine/LLMEngine.java",
         "java/com/miniv/ai/engine/SimpleLLMEngine.java",
+        "java/com/miniv/ai/engine/VendorNpuLLMEngine.java",
         "java/com/miniv/ai/service/MINIVAIService.java",
     ],
     static_libs: [
         "mini-v-aidl-java",
+        "vendor-miniv-ai-aidl-V1-java",
     ],
     libs: [
         "framework",
