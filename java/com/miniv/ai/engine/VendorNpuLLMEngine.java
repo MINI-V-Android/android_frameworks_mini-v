@@ -82,7 +82,7 @@ public class VendorNpuLLMEngine implements LLMEngine {
     private volatile IMiniVAiHal mHal;
 
     public VendorNpuLLMEngine() {
-        mHal = fetchHal();
+        mHal = null;
     }
 
     /**
