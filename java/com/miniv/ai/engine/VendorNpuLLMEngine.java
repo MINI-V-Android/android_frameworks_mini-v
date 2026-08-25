@@ -190,6 +190,11 @@ public class VendorNpuLLMEngine implements LLMEngine {
                 // tracked" value for versioned AIDL Stub implementers.
                 return null;
             }
+
+            @Override
+            public int getInterfaceVersion() {
+                return IMiniVAiStreamCallback.VERSION;
+            }
         };
 
         try {
