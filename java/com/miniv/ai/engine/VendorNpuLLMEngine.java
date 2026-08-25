@@ -36,7 +36,17 @@ public class VendorNpuLLMEngine implements LLMEngine {
                 + "<|im_start|>assistant\n";
     }
 
+    // NOTE: must match the nCtx value passed to `npu_load` on the vendor
+    // side (daemon/main.cpp NPU_LOAD handler -> NpuLLMEngine::load()).
+    // There is currently no way to query the actually-loaded context size
+    // from IMiniVAiHal, so this has to be kept in sync by hand. If the
+    // model is ever reloaded with a different nCtx, update this constant.
     private static final int MODEL_N_CTX = 2048;
+
+    // Headroom for chat-template overhead and tokenizer estimation error —
+    // the estimate below is a rough chars-per-token heuristic, not an
+    // actual tokenizer count (none is exposed at this layer), so we leave
+    // extra margin rather than cutting it exactly at nCtx.
     private static final int CONTEXT_SAFETY_MARGIN = 64;
 
     /**
@@ -171,6 +181,14 @@ public class VendorNpuLLMEngine implements LLMEngine {
             @Override
             public void onError(int sid, int code, String message) {
                 callback.onError(mapInternalError(code), message);
+            }
+
+            @Override
+            public String getInterfaceHash() {
+                // Hash checking isn't enforced for this hand-written client
+                // side callback implementation — null is the standard "not
+                // tracked" value for versioned AIDL Stub implementers.
+                return null;
             }
         };
 
