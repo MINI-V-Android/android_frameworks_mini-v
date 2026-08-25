@@ -7,7 +7,7 @@ import android.util.Log;
 import com.miniv.ai.ILLMStreamCallback;
 import com.miniv.ai.IMINIVAIService;
 import com.miniv.ai.engine.LLMEngine;
-import com.miniv.ai.engine.SimpleLLMEngine;
+import com.miniv.ai.engine.VendorNpuLLMEngine;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;

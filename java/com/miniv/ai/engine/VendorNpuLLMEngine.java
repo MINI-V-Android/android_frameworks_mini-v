@@ -21,6 +21,22 @@ public class VendorNpuLLMEngine implements LLMEngine {
     private static final String TAG = "VendorNpuLLMEngine";
     private static final String HAL_INSTANCE = "vendor.miniv.ai.IMiniVAiHal/default";
 
+    // NOTE: the vendor daemon (NpuLLMEngine::infer()) does zero prompt
+    // formatting — it tokenizes exactly whatever string it's given. Every
+    // caller of IMiniVAiHal.inferStream() is responsible for building the
+    // model's expected chat format itself. Qwen2.5 uses ChatML; this is
+    // hardcoded here because IMiniVAiHal doesn't currently expose the
+    // loaded model's chat template. If/when multi-model support lands,
+    // this needs to move behind something like hal.getChatTemplate().
+    private static final String DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant.";
+
+    // chatML added
+    private static String applyChatTemplate(String userPrompt) {
+        return "<|im_start|>system\n" + DEFAULT_SYSTEM_PROMPT + "<|im_end|>\n"
+                + "<|im_start|>user\n" + userPrompt + "<|im_end|>\n"
+                + "<|im_start|>assistant\n";
+    }
+
     // Vendor-HAL-internal error codes reported via IMiniVAiStreamCallback.onError()
     // and IMiniVAiHal's synchronous return values — kept private to this class,
     // translated to LLMEngine.ErrorCode before ever reaching TokenCallback.
@@ -138,7 +154,8 @@ public class VendorNpuLLMEngine implements LLMEngine {
         try {
             // Synchronous return only tells us whether the request was
             // *accepted*; actual success/failure streams back via halCallback.
-            int ret = hal.inferStream(sessionId, prompt, maxTokens, halCallback);
+            String formattedPrompt = applyChatTemplate(prompt);
+            int ret = hal.inferStream(sessionId, formattedPrompt, maxTokens, halCallback);
             if (ret != 0) {
                 Log.w(TAG, "inferStream(" + sessionId + ") rejected, HAL returned " + ret);
                 callback.onError(ErrorCode.GENERIC_FAILURE,
