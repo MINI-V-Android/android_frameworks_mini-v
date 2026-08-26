@@ -1,3 +1,5 @@
+hal_client_domain(system_server, hal_miniv_ai)
+
 type miniv_ai_service, service_manager_type;
 
 allow system_server miniv_ai_service:service_manager { add };
