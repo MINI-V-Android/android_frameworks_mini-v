@@ -8,6 +8,10 @@ import android.util.Log;
 import vendor.miniv.ai.IMiniVAiHal;
 import vendor.miniv.ai.IMiniVAiStreamCallback;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * LLM Engine implementation backed by the vendor NPU HAL
  * (vendor.miniv.ai.IMiniVAiHal).
@@ -29,24 +33,23 @@ public class VendorNpuLLMEngine implements LLMEngine {
     // loaded model's chat template. If/when multi-model support lands,
     // this needs to move behind something like hal.getChatTemplate().
     private static final String DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant.";
+    
+    private final Set<Integer> mSeenSessions =
+            Collections.synchronizedSet(new HashSet<>());
 
-    private static String applyChatTemplate(String userPrompt) {
-        return "<|im_start|>system\n" + DEFAULT_SYSTEM_PROMPT + "<|im_end|>\n"
-                + "<|im_start|>user\n" + userPrompt + "<|im_end|>\n"
+    private String applyChatTemplate(int sessionId, String userPrompt) {
+        boolean firstTurn = mSeenSessions.add(sessionId); 
+
+        if (firstTurn) {
+            return "<|im_start|>system\n" + DEFAULT_SYSTEM_PROMPT + "<|im_end|>\n"
+                    + "<|im_start|>user\n" + userPrompt + "<|im_end|>\n"
+                    + "<|im_start|>assistant\n";
+        }
+        return "<|im_end|>\n<|im_start|>user\n" + userPrompt + "<|im_end|>\n"
                 + "<|im_start|>assistant\n";
     }
 
-    // NOTE: must match the nCtx value passed to `npu_load` on the vendor
-    // side (daemon/main.cpp NPU_LOAD handler -> NpuLLMEngine::load()).
-    // There is currently no way to query the actually-loaded context size
-    // from IMiniVAiHal, so this has to be kept in sync by hand. If the
-    // model is ever reloaded with a different nCtx, update this constant.
     private static final int MODEL_N_CTX = 2048;
-
-    // Headroom for chat-template overhead and tokenizer estimation error —
-    // the estimate below is a rough chars-per-token heuristic, not an
-    // actual tokenizer count (none is exposed at this layer), so we leave
-    // extra margin rather than cutting it exactly at nCtx.
     private static final int CONTEXT_SAFETY_MARGIN = 64;
 
     /**
@@ -85,11 +88,6 @@ public class VendorNpuLLMEngine implements LLMEngine {
         mHal = null;
     }
 
-    /**
-     * Fetch (or re-fetch) the vendor HAL binder. Called at construction time
-     * and lazily retried if a prior call hit a dead binder — the vendor
-     * ai_daemon process can restart independently of system_server.
-     */
     private static IMiniVAiHal fetchHal() {
         IBinder binder = ServiceManager.waitForDeclaredService(HAL_INSTANCE);
         if (binder == null) {
@@ -145,6 +143,8 @@ public class VendorNpuLLMEngine implements LLMEngine {
 
     @Override
     public boolean destroySession(int sessionId) {
+        mSeenSessions.remove(sessionId);
+
         IMiniVAiHal hal = hal();
         if (hal == null) {
             return false;
@@ -200,7 +200,7 @@ public class VendorNpuLLMEngine implements LLMEngine {
         try {
             // Synchronous return only tells us whether the request was
             // *accepted*; actual success/failure streams back via halCallback.
-            String formattedPrompt = applyChatTemplate(prompt);
+            String formattedPrompt = applyChatTemplate(sessionId, prompt);
             int clampedMaxTokens = clampMaxTokens(formattedPrompt, maxTokens);
             if (clampedMaxTokens < maxTokens) {
                 Log.w(TAG, "maxTokens clamped from " + maxTokens + " to " + clampedMaxTokens
