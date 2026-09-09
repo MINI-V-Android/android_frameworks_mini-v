@@ -38,10 +38,7 @@ interface IMINIVAIService {
     boolean destroySession(int sessionId);
 
     /**
-     * Queue an inference request onto the given session. Returns immediately
-     * after the request is queued — does not wait for completion. If another
-     * request on the same session is still running, this one simply starts
-     * after it finishes (appears as "slower", not as an error).
+     * Queue an inference request onto the given session. (Default / Auto mode)
      * 
      * @param sessionId Session ID to run inference on
      * @param prompt Input prompt to model
@@ -52,6 +49,16 @@ interface IMINIVAIService {
      *      Negative otherwise
      */
     int inferStream(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback);
+
+    /**
+     * Queue a Single-Decode inference request (N=1, Real-time immediate streaming).
+     */
+    int inferStreamSingle(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback);
+
+    /**
+     * Queue a Multi-Decode inference request (N=2, Best-of-N candidate selection).
+     */
+    int inferStreamMulti(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback);
 
     /**
      * Cancel in-flight or queued work for a session.

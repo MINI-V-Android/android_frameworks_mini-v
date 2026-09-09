@@ -61,7 +61,7 @@ public interface LLMEngine {
     boolean destroySession(int sessionId);
 
     /**
-     * Run inference and stream tokens via callback
+     * Run inference and stream tokens via callback (Default / Auto mode)
      *
      * @param sessionId Session ID for this inference
      * @param prompt    Input prompt
@@ -69,6 +69,20 @@ public interface LLMEngine {
      * @param callback  Token stream callback
      */
     void infer(int sessionId, String prompt, int maxTokens, TokenCallback callback);
+
+    /**
+     * Run Single-Decode inference (N=1, Real-time immediate streaming)
+     */
+    default void inferSingle(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
+        infer(sessionId, prompt, maxTokens, callback);
+    }
+
+    /**
+     * Run Multi-Decode inference (N=2, Best-of-N candidate selection)
+     */
+    default void inferMulti(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
+        infer(sessionId, prompt, maxTokens, callback);
+    }
 
     /**
      * Cancel ongoing inference for given session
