@@ -151,8 +151,12 @@ public class MINIVAIService extends IMINIVAIService.Stub {
      *         Negative otherwise
      *         Error codes is defined at [IMINIVAIService]
      */
-    @Override
-    public int inferStream(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback) {
+    @FunctionalInterface
+    private interface EngineInferInvoker {
+        void invoke(LLMEngine engine, int sessionId, String prompt, int maxTokens, LLMEngine.TokenCallback callback);
+    }
+
+    private int queueInference(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback, EngineInferInvoker invoker) {
         // Check if engine is ready
         if (!mEngine.isReady()) {
             Log.w(TAG, "inferStream() called but engine is not ready");
@@ -179,14 +183,12 @@ public class MINIVAIService extends IMINIVAIService.Stub {
 
         // Queue engine inference on the session's Executor
         record.currentTask = record.executor.submit(() -> {
-            mEngine.infer(sessionId, prompt, maxTokens, new LLMEngine.TokenCallback() {
+            invoker.invoke(mEngine, sessionId, prompt, maxTokens, new LLMEngine.TokenCallback() {
                 @Override
                 public void onToken(String token) {
                     try {
-                        // Callback onToken
                         callback.onToken(sessionId, token);
                     } catch (RemoteException e) {
-                        // Callback cancel
                         Log.w(TAG, "onToken failed, cancelling session " + sessionId, e);
                         mEngine.cancel(sessionId);
                     }
@@ -195,7 +197,6 @@ public class MINIVAIService extends IMINIVAIService.Stub {
                 @Override
                 public void onComplete() {
                     try {
-                        // Callback onComplete
                         callback.onComplete(sessionId);
                     } catch (RemoteException e) {
                         Log.w(TAG, "onComplete failed, session " + sessionId, e);
@@ -204,20 +205,13 @@ public class MINIVAIService extends IMINIVAIService.Stub {
 
                 @Override
                 public void onError(int code, String message) {
-                    // Translate the engine-internal error code into the
-                    // AIDL-level contract — callers should never need to
-                    // know about LLMEngine's internals
                     int reportedCode = translateErrorCode(code);
-
                     try {
-                        // Callback onError
                         callback.onError(sessionId, reportedCode, message);
                     } catch (RemoteException e) {
                         Log.w(TAG, "onError failed, session " + sessionId, e);
                     }
 
-                    // Vendor already discarded this session
-                    // -> destroy local session info
                     if (code == LLMEngine.ErrorCode.SESSION_EVICTED) {
                         destroySession(sessionId);
                     }
@@ -225,8 +219,25 @@ public class MINIVAIService extends IMINIVAIService.Stub {
             });
         });
 
-        // Return success
         return 0;
+    }
+
+    @Override
+    public int inferStream(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback) {
+        return queueInference(sessionId, prompt, maxTokens, callback,
+                (engine, sid, p, m, cb) -> engine.infer(sid, p, m, cb));
+    }
+
+    @Override
+    public int inferStreamSingle(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback) {
+        return queueInference(sessionId, prompt, maxTokens, callback,
+                (engine, sid, p, m, cb) -> engine.inferSingle(sid, p, m, cb));
+    }
+
+    @Override
+    public int inferStreamMulti(int sessionId, String prompt, int maxTokens, ILLMStreamCallback callback) {
+        return queueInference(sessionId, prompt, maxTokens, callback,
+                (engine, sid, p, m, cb) -> engine.inferMulti(sid, p, m, cb));
     }
 
     /**
