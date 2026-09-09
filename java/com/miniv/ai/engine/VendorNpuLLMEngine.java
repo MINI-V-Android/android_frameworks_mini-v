@@ -159,12 +159,8 @@ public class VendorNpuLLMEngine implements LLMEngine {
         }
     }
 
-    @FunctionalInterface
-    private interface HalInferCall {
-        int call(IMiniVAiHal hal, int sessionId, String prompt, int maxTokens, IMiniVAiStreamCallback callback) throws RemoteException;
-    }
-
-    private void doInfer(int sessionId, String prompt, int maxTokens, TokenCallback callback, String opName, HalInferCall halCall) {
+    @Override
+    public void infer(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
         IMiniVAiHal hal = hal();
         if (hal == null) {
             callback.onError(ErrorCode.GENERIC_FAILURE, "vendor HAL unavailable");
@@ -205,35 +201,37 @@ public class VendorNpuLLMEngine implements LLMEngine {
                 Log.w(TAG, "maxTokens clamped from " + maxTokens + " to " + clampedMaxTokens
                         + " to fit context window (nCtx=" + MODEL_N_CTX + ")");
             }
-            int ret = halCall.call(hal, sessionId, formattedPrompt, clampedMaxTokens, halCallback);
+            int ret = hal.inferStream(sessionId, formattedPrompt, clampedMaxTokens, halCallback);
             if (ret != 0) {
-                Log.w(TAG, opName + "(" + sessionId + ") rejected, HAL returned " + ret);
+                Log.w(TAG, "inferStream(" + sessionId + ") rejected, HAL returned " + ret);
                 callback.onError(ErrorCode.GENERIC_FAILURE,
-                        "vendor HAL rejected " + opName + " (code " + ret + ")");
+                        "vendor HAL rejected inferStream (code " + ret + ")");
             }
         } catch (RemoteException e) {
-            Log.e(TAG, opName + "(" + sessionId + ") failed", e);
+            Log.e(TAG, "inferStream(" + sessionId + ") failed", e);
             mHal = null;
             callback.onError(ErrorCode.GENERIC_FAILURE, "vendor HAL call failed: " + e.getMessage());
         }
     }
 
     @Override
-    public void infer(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
-        doInfer(sessionId, prompt, maxTokens, callback, "inferStream",
-                (hal, sid, p, m, cb) -> hal.inferStream(sid, p, m, cb));
-    }
-
-    @Override
     public void inferSingle(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
-        doInfer(sessionId, prompt, maxTokens, callback, "inferStreamSingle",
-                (hal, sid, p, m, cb) -> hal.inferStreamSingle(sid, p, m, cb));
+        try {
+            android.os.SystemProperties.set("persist.vendor.miniv.decode_mode", "single");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to set persist.vendor.miniv.decode_mode property", e);
+        }
+        infer(sessionId, prompt, maxTokens, callback);
     }
 
     @Override
     public void inferMulti(int sessionId, String prompt, int maxTokens, TokenCallback callback) {
-        doInfer(sessionId, prompt, maxTokens, callback, "inferStreamMulti",
-                (hal, sid, p, m, cb) -> hal.inferStreamMulti(sid, p, m, cb));
+        try {
+            android.os.SystemProperties.set("persist.vendor.miniv.decode_mode", "multi");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to set persist.vendor.miniv.decode_mode property", e);
+        }
+        infer(sessionId, prompt, maxTokens, callback);
     }
 
     @Override
